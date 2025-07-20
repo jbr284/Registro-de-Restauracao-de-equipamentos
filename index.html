@@ -4,8 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Saripan</title>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-  <link rel="manifest" href="manifest.json">
+  <link rel="manifest" href="manifest.json" />
   <script>
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('service-worker.js')
@@ -13,8 +12,231 @@
         .catch(err => console.error('Erro ao registrar o Service Worker:', err));
     }
   </script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 0; background: #f4f4f4; }
+    .container { max-width: 800px; margin: auto; padding: 20px; background: white; }
+    h1, h2 { text-align: center; color: #2c3e50; }
+    button { padding: 10px; margin: 10px 5px; font-weight: bold; border: none; border-radius: 5px; background: #2980b9; color: white; cursor: pointer; }
+    button:hover { background: #216b99; }
+    .tab { display: none; }
+    .tab.active { display: block; }
+    select, input[type="text"] { width: 100%; padding: 8px; margin: 5px 0; }
+    .ordem-card { border: 1px solid #ccc; padding: 10px; border-radius: 5px; margin: 10px 0; background: #fff; width: 100%; max-width: 800px; box-sizing: border-box; }
+    .editable {
+      border: 1px dashed #aaa;
+      padding: 5px;
+      min-height: 30px;
+      white-space: pre-wrap;
+      margin-bottom: 10px;
+      position: relative;
+      cursor: text;
+    }
+    .editable::before {
+      content: attr(data-placeholder);
+      color: #999;
+      pointer-events: none;
+      position: absolute;
+      margin-left: 5px;
+      opacity: 0.6;
+    }
+    .editable:focus::before,
+    .editable:not(:empty)::before {
+      content: '';
+    }
+    .ordem-header { cursor: pointer; font-weight: bold; background: #ecf0f1; padding: 8px; border-radius: 5px; }
+    .ordem-body { display: none; padding-top: 10px; }
+  </style>
 </head>
 <body>
-<!-- O restante do conteúdo HTML inserido pelo usuário -->
+<div class="container">
+  <h1>Saripan</h1>
+  <h2>Restauração de Câmara de Fermentação</h2>
+  <div id="menu">
+    <button onclick="showTab(0)">Cadastrar Serviço</button>
+    <button onclick="showOrdens()">OS's Cadastradas</button>
+  </div>
+
+  <div class="tab" id="tab0">
+    <label>Equipamento:</label>
+    <select id="equipamento">
+      <option value="">Selecione</option>
+      <option value="Câmara de 500 unidades">Câmara de 500 unidades</option>
+      <option value="Câmara de 1000 unidades">Câmara de 1000 unidades</option>
+    </select>
+    <button onclick="showTab(1)">Próximo</button>
+  </div>
+
+  <div class="tab" id="tab1">
+    <h3>Escolha a Estrutura</h3>
+    <button onclick="showTab(2)">Estrutura Interna</button>
+    <button onclick="showTab(3)">Estrutura Externa</button>
+    <button onclick="showTab(4)">Materiais e Peças</button>
+  </div>
+
+  <div class="tab" id="tab2">
+    <h3>Estrutura Interna</h3>
+    <label>Chapas Laterais:</label><select id="interna1"><option>Ok</option><option>Restaurar</option></select>
+    <label>Piso de inox:</label><select id="interna2"><option>Ok</option><option>Substituir</option></select>
+    <label>Dreno:</label><select id="interna3"><option>Ok</option><option>Substituir</option></select>
+    <button onclick="showTab(1)">Voltar</button>
+  </div>
+
+  <div class="tab" id="tab3">
+    <h3>Estrutura Externa</h3>
+    <label>Funilaria externa:</label><select id="externa1"><option>Ok</option><option>Restaurar</option></select>
+    <label>Fundo:</label><select id="externa2"><option>Ok</option><option>Substituir</option></select>
+    <label>Rodízios:</label><select id="externa3"><option>Ok</option><option>Substituir</option></select>
+    <label>Estrutura de madeiras:</label><select id="externa4"><option>Ok</option><option>Substituir</option></select>
+    <label>Dobradiças:</label><select id="externa5"><option>Ok</option><option>Substituir</option></select>
+    <label>Fechadura:</label><select id="externa6"><option>Ok</option><option>Substituir</option></select>
+    <button onclick="showTab(1)">Voltar</button>
+  </div>
+
+  <div class="tab" id="tab4">
+    <h3>Materiais e Peças</h3>
+    <div id="materiais"></div>
+    <button onclick="gerarOS()">Gerar Ordem de Serviço</button>
+    <button onclick="showTab(1)">Voltar</button>
+  </div>
+
+  <div class="tab" id="tab5">
+    <h2>OS's Cadastradas</h2>
+    <div id="lista-os"></div>
+    <button onclick="showTab(null)">Voltar ao Menu</button>
+  </div>
+</div>
+
+<script>
+const materiaisList = ["Fundo externo inox","Piso interno inox","Chapas de Alumínio","Rodízios","Madeiras","Dobradiças","Fechadura","Rebites","Brocas"];
+const matContainer = document.getElementById('materiais');
+materiaisList.forEach((m, i) => {
+  matContainer.innerHTML += `<label>${m}:</label><select id="mat${i}"><option>Ok</option><option>Estoque zerado</option></select><input type="text" id="qtd${i}" placeholder="Quantidade (se Ok)">`;
+});
+
+function showTab(i) {
+  document.querySelectorAll('.tab').forEach((el, index) => {
+    el.classList.toggle('active', index === i);
+  });
+  document.getElementById('menu').style.display = i === null ? 'block' : 'none';
+}
+
+function gerarOS() {
+  const equipamento = document.getElementById('equipamento').value;
+  const interna = [
+    {nome:'Chapas Laterais', val:interna1.value},
+    {nome:'Piso de Inox', val:interna2.value},
+    {nome:'Dreno', val:interna3.value},
+  ];
+  const externa = [
+    {nome:'Funilaria externa', val:externa1.value},
+    {nome:'Fundo', val:externa2.value},
+    {nome:'Rodízios', val:externa3.value},
+    {nome:'Estrutura de madeiras', val:externa4.value},
+    {nome:'Dobradiças', val:externa5.value},
+    {nome:'Fechadura', val:externa6.value},
+  ];
+  const materiais = materiaisList.map((nome, i) => ({
+    nome,
+    val: document.getElementById('mat'+i).value,
+    qtd: document.getElementById('qtd'+i).value
+  }));
+  const os = { equipamento, interna, externa, materiais, data: new Date().toLocaleString() };
+  const salvas = JSON.parse(localStorage.getItem('ordens') || '[]');
+  salvas.push(os);
+  localStorage.setItem('ordens', JSON.stringify(salvas));
+  alert('Ordem de serviço salva!');
+  showOrdens();
+}
+
+function showOrdens() {
+  showTab(5);
+  const lista = document.getElementById('lista-os');
+  lista.innerHTML = '';
+  const ordens = JSON.parse(localStorage.getItem('ordens') || '[]');
+  if (!ordens.length) {
+    lista.innerHTML = '<p>Nenhuma OS cadastrada.</p>';
+    return;
+  }
+  ordens.forEach((os, index) => {
+    let html = `<div class='ordem-card' id='os-${index}' style='width: 210mm; max-width: 100%; overflow-wrap: break-word;'>
+      <div class='ordem-header' onclick='toggleCard(${index})'>Ordem de Serviço - ${os.equipamento} (${os.data})</div>
+      <div class='ordem-body' id='card-${index}'>
+      <h4>Estrutura Interna:</h4>`;
+    os.interna.forEach(i => html += `<p>${i.nome}: ${i.val}</p><div class='editable' contenteditable='true' data-placeholder='Relato técnico aqui'></div>`);
+    html += '<h4>Estrutura Externa:</h4>';
+    os.externa.forEach(i => html += `<p>${i.nome}: ${i.val}</p><div class='editable' contenteditable='true' data-placeholder='Relato técnico aqui'></div>`);
+    html += '<h4>Materiais e Peças:</h4>';
+    os.materiais.forEach(i => html += `<p>${i.nome}: ${i.val} ${i.qtd ? 'Qtd: ' + i.qtd : ''}</p><div class='editable' contenteditable='true' data-placeholder='Relato técnico aqui'></div>`);
+    html += `<p style='text-align:right'>
+      <button onclick='exportarImagem(${index})'>Exportar Imagem</button>
+      <button onclick='confirmarFinalizacao(${index})'>Restauração finalizada</button></p>
+      </div></div>`;
+    lista.innerHTML += html;
+  });
+}
+
+function toggleCard(i) {
+  const card = document.getElementById('card-' + i);
+  card.style.display = card.style.display === 'none' || !card.style.display ? 'block' : 'none';
+}
+
+function exportarImagem(i, incluirRodape = false) {
+  const elemento = document.getElementById('os-' + i);
+  const cardBody = document.getElementById('card-' + i);
+  const estavaEscondido = cardBody.style.display === 'none' || !cardBody.style.display;
+  if (estavaEscondido) cardBody.style.display = 'block';
+
+  let rodape, nomeArquivo;
+  if (incluirRodape) {
+    rodape = document.createElement('div');
+    rodape.style.textAlign = 'center';
+    rodape.style.marginTop = '15px';
+    rodape.style.fontWeight = 'bold';
+    rodape.style.fontSize = '14px';
+    rodape.style.borderTop = '1px solid #ccc';
+    rodape.style.paddingTop = '8px';
+    const hoje = new Date();
+    const dataFormatada = hoje.toLocaleDateString('pt-BR');
+    rodape.textContent = `Serviço finalizado em ${dataFormatada}`;
+    elemento.appendChild(rodape);
+
+    const ordens = JSON.parse(localStorage.getItem('ordens') || '[]');
+    const equipamento = ordens[i].equipamento || 'Servico';
+    const equipamentoSanitized = equipamento.toLowerCase().replace(/\s+/g, '_').replace(/[^\w_-]/g, '');
+    const d = hoje.getDate().toString().padStart(2, '0');
+    const m = (hoje.getMonth() + 1).toString().padStart(2, '0');
+    const a = hoje.getFullYear();
+    nomeArquivo = `${equipamentoSanitized}_servico_finalizado_em_${d}-${m}-${a}.jpeg`;
+  } else {
+    nomeArquivo = `OS-${i + 1}.jpeg`;
+  }
+
+  html2canvas(elemento, { scale: 2, useCORS: true }).then(canvas => {
+    const link = document.createElement('a');
+    link.download = nomeArquivo;
+    link.href = canvas.toDataURL('image/jpeg', 0.95);
+    link.click();
+    if (rodape) elemento.removeChild(rodape);
+    if (estavaEscondido) cardBody.style.display = 'none';
+  });
+}
+
+function confirmarFinalizacao(i) {
+  if (confirm("Deseja salvar uma imagem antes de finalizar?")) {
+    exportarImagem(i, true);
+    setTimeout(() => finalizar(i), 1000);
+  } else {
+    finalizar(i);
+  }
+}
+
+function finalizar(i) {
+  const ordens = JSON.parse(localStorage.getItem('ordens') || '[]');
+  ordens.splice(i, 1);
+  localStorage.setItem('ordens', JSON.stringify(ordens));
+  showOrdens();
+}
+</script>
 </body>
 </html>
