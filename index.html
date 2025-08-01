@@ -1,10 +1,12 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Saripan</title>
-  <link rel="manifest" href="manifest.json" />
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Saripan - Restauração de Câmaras</title>
+    <link rel="manifest" href="manifest.json" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script>
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('service-worker.js')
@@ -12,231 +14,440 @@
         .catch(err => console.error('Erro ao registrar o Service Worker:', err));
     }
   </script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-  <style>
-    body { font-family: Arial, sans-serif; margin: 0; background: #f4f4f4; }
-    .container { max-width: 800px; margin: auto; padding: 20px; background: white; }
-    h1, h2 { text-align: center; color: #2c3e50; }
-    button { padding: 10px; margin: 10px 5px; font-weight: bold; border: none; border-radius: 5px; background: #2980b9; color: white; cursor: pointer; }
-    button:hover { background: #216b99; }
-    .tab { display: none; }
-    .tab.active { display: block; }
-    select, input[type="text"] { width: 100%; padding: 8px; margin: 5px 0; }
-    .ordem-card { border: 1px solid #ccc; padding: 10px; border-radius: 5px; margin: 10px 0; background: #fff; width: 100%; max-width: 800px; box-sizing: border-box; }
-    .editable {
-      border: 1px dashed #aaa;
-      padding: 5px;
-      min-height: 30px;
-      white-space: pre-wrap;
-      margin-bottom: 10px;
-      position: relative;
-      cursor: text;
-    }
-    .editable::before {
-      content: attr(data-placeholder);
-      color: #999;
-      pointer-events: none;
-      position: absolute;
-      margin-left: 5px;
-      opacity: 0.6;
-    }
-    .editable:focus::before,
-    .editable:not(:empty)::before {
-      content: '';
-    }
-    .ordem-header { cursor: pointer; font-weight: bold; background: #ecf0f1; padding: 8px; border-radius: 5px; }
-    .ordem-body { display: none; padding-top: 10px; }
-  </style>
+
+    <style>
+        :root {
+            --cor-primaria: #005A9C;
+            --cor-secundaria: #EAEAEA;
+            --cor-texto: #333;
+            --cor-sucesso: #28a745;
+            --cor-borda: #ccc;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f4f4f4;
+            color: var(--cor-texto);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+        }
+
+        .container {
+            max-width: 1100px;
+            width: 100%;
+            background: #fff;
+            padding: 25px;
+            border-radius: 8px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        }
+
+        header {
+            text-align: center;
+            border-bottom: 2px solid var(--cor-secundaria);
+            padding-bottom: 15px;
+            margin-bottom: 25px;
+        }
+
+        header h1 {
+            color: var(--cor-primaria);
+            margin: 0;
+        }
+
+        .view { display: block; }
+        .hidden { display: none !important; }
+
+        .home-buttons { display: flex; flex-direction: column; gap: 15px; align-items: center; padding: 40px 0; }
+        .btn {
+            padding: 15px 30px; font-size: 18px; border: none; border-radius: 5px;
+            cursor: pointer; transition: all 0.3s ease; color: #fff; min-width: 300px; text-align: center;
+        }
+        .btn-principal { background-color: var(--cor-primaria); }
+        .btn-principal:hover { background-color: #004170; }
+        .btn-secundario { background-color: #6c757d; }
+        .btn-secundario:hover { background-color: #5a6268; }
+        .btn-sucesso { background-color: var(--cor-sucesso); }
+        .btn-sucesso:hover { background-color: #218838; }
+        .btn-pequeno { padding: 8px 12px; font-size: 14px; min-width: auto; }
+
+        .tab-nav { display: flex; border-bottom: 1px solid var(--cor-borda); margin-bottom: 20px; }
+        .tab-button {
+            padding: 10px 20px; cursor: pointer; border: none; background-color: transparent;
+            font-size: 16px; color: #777; border-bottom: 3px solid transparent;
+        }
+        .tab-button.active { color: var(--cor-primaria); border-bottom: 3px solid var(--cor-primaria); }
+        .tab-button:disabled { color: #ccc; cursor: not-allowed; }
+        
+        .form-group { margin-bottom: 20px; }
+        .form-group label { display: block; font-weight: bold; margin-bottom: 8px; }
+        .form-group select, .form-group input { width: 100%; padding: 10px; border: 1px solid var(--cor-borda); border-radius: 4px; box-sizing: border-box; }
+
+        .checklist-item {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 12px 0; border-bottom: 1px solid var(--cor-secundaria);
+        }
+        .checklist-item-options { display: flex; gap: 10px; align-items: center; }
+        .checklist-item-options select { min-width: 120px; }
+        .quantity-input { width: 100px !important; }
+
+        .form-navigation-buttons { display: flex; justify-content: space-between; margin-top: 30px; }
+
+        #osListContainer { display: grid; grid-template-columns: 1fr; gap: 25px; }
+        .os-card {
+            background: #fff; border: 1px solid var(--cor-borda); border-left: 5px solid var(--cor-primaria);
+            border-radius: 5px; padding: 20px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); transition: all 0.3s ease;
+        }
+        .os-card.finalizado { border-left: 5px solid var(--cor-sucesso); background-color: #f0fff4; opacity: 0.8; }
+        .os-card h3 { margin-top: 0; color: var(--cor-primaria); }
+
+        .os-card-body {
+            display: grid; grid-template-columns: repeat(3, 1fr); gap: 25px; margin-top: 15px;
+        }
+
+        .os-card-section h4 {
+            border-bottom: 1px solid var(--cor-secundaria); padding-bottom: 5px;
+            margin-bottom: 10px; font-size: 16px;
+        }
+
+        .os-item {
+            display: flex; flex-direction: column; align-items: flex-start; gap: 6px;
+            font-size: 14px; padding-bottom: 8px; border-bottom: 1px dotted #eee;
+        }
+        .os-item-header { display: flex; justify-content: space-between; width: 100%; }
+        .os-item-label { font-weight: bold; }
+        .os-item-value { font-style: italic; color: #555; }
+        .os-item-relatorio input { width: 100%; padding: 5px; border: 1px solid #ddd; border-radius: 3px; font-size: 13px; }
+        
+        .os-card-footer {
+            margin-top: 20px; padding-top: 15px; border-top: 1px solid var(--cor-secundaria);
+            display: flex; justify-content: space-between; align-items: center;
+        }
+        .os-card-footer .date { font-size: 14px; color: #666; }
+        .os-card-footer .date.finalizado {
+            color: var(--cor-sucesso);
+            font-weight: bold;
+        }
+
+        .relatorio-pdf-text { display: none; }
+        .is-generating-pdf .os-item-relatorio input { display: none; }
+        .is-generating-pdf .os-item-relatorio .relatorio-pdf-text {
+            display: block; width: 100%; min-height: 26px; padding: 5px;
+            border: 1px solid #ddd; border-radius: 3px; background-color: #f9f9f9;
+            box-sizing: border-box; white-space: pre-wrap; word-wrap: break-word;
+        }
+    </style>
 </head>
 <body>
-<div class="container">
-  <h1>Saripan</h1>
-  <h2>Restauração de Câmara de Fermentação</h2>
-  <div id="menu">
-    <button onclick="showTab(0)">Cadastrar Serviço</button>
-    <button onclick="showOrdens()">OS's Cadastradas</button>
-  </div>
 
-  <div class="tab" id="tab0">
-    <label>Equipamento:</label>
-    <select id="equipamento">
-      <option value="">Selecione</option>
-      <option value="Câmara de 500 unidades">Câmara de 500 unidades</option>
-      <option value="Câmara de 1000 unidades">Câmara de 1000 unidades</option>
-    </select>
-    <button onclick="showTab(1)">Próximo</button>
-  </div>
-
-  <div class="tab" id="tab1">
-    <h3>Escolha a Estrutura</h3>
-    <button onclick="showTab(2)">Estrutura Interna</button>
-    <button onclick="showTab(3)">Estrutura Externa</button>
-    <button onclick="showTab(4)">Materiais e Peças</button>
-  </div>
-
-  <div class="tab" id="tab2">
-    <h3>Estrutura Interna</h3>
-    <label>Chapas Laterais:</label><select id="interna1"><option>Ok</option><option>Restaurar</option></select>
-    <label>Piso de inox:</label><select id="interna2"><option>Ok</option><option>Substituir</option></select>
-    <label>Dreno:</label><select id="interna3"><option>Ok</option><option>Substituir</option></select>
-    <button onclick="showTab(1)">Voltar</button>
-  </div>
-
-  <div class="tab" id="tab3">
-    <h3>Estrutura Externa</h3>
-    <label>Funilaria externa:</label><select id="externa1"><option>Ok</option><option>Restaurar</option></select>
-    <label>Fundo:</label><select id="externa2"><option>Ok</option><option>Substituir</option></select>
-    <label>Rodízios:</label><select id="externa3"><option>Ok</option><option>Substituir</option></select>
-    <label>Estrutura de madeiras:</label><select id="externa4"><option>Ok</option><option>Substituir</option></select>
-    <label>Dobradiças:</label><select id="externa5"><option>Ok</option><option>Substituir</option></select>
-    <label>Fechadura:</label><select id="externa6"><option>Ok</option><option>Substituir</option></select>
-    <button onclick="showTab(1)">Voltar</button>
-  </div>
-
-  <div class="tab" id="tab4">
-    <h3>Materiais e Peças</h3>
-    <div id="materiais"></div>
-    <button onclick="gerarOS()">Gerar Ordem de Serviço</button>
-    <button onclick="showTab(1)">Voltar</button>
-  </div>
-
-  <div class="tab" id="tab5">
-    <h2>OS's Cadastradas</h2>
-    <div id="lista-os"></div>
-    <button onclick="showTab(null)">Voltar ao Menu</button>
-  </div>
-</div>
-
+    <div class="container">
+        <header>
+            <h1>Saripan</h1>
+            <p>Sistema de Gestão de Restauração de Câmaras de Fermentação</p>
+        </header>
+        <div id="homeView" class="view">
+            <div class="home-buttons">
+                <button id="btnGoToCadastro" class="btn btn-principal">Cadastrar Serviço</button>
+                <button id="btnGoToOSList" class="btn btn-secundario">Ordens de Serviços Cadastradas</button>
+            </div>
+        </div>
+        <div id="cadastroView" class="view hidden">
+            <button id="btnBackToHomeFromCadastro" class="btn btn-secundario btn-pequeno" style="margin-bottom: 20px;">Voltar</button>
+            <form id="formCadastro">
+                <div class="tab-nav">
+                    <button type="button" data-tab="1" class="tab-button active">1. Equipamento</button>
+                    <button type="button" data-tab="2" class="tab-button" disabled>2. Estrutura Interna</button>
+                    <button type="button" data-tab="3" class="tab-button" disabled>3. Estrutura Externa</button>
+                    <button type="button" data-tab="4" class="tab-button" disabled>4. Materiais e Peças</button>
+                </div>
+                <div id="tabPane1" class="tab-pane">
+                    <div class="form-group"><label for="equipamento">Equipamento</label><select id="equipamento" name="equipamento" required><option value="" disabled selected>Selecione...</option><option value="Câmara de 1000 unidades">Câmara de 1000 unidades</option><option value="Câmara de 500 unidades">Câmara de 500 unidades</option></select></div>
+                </div>
+                <div id="tabPane2" class="tab-pane hidden">
+                    <h4>Checklist - Estrutura Interna</h4>
+                    <div class="checklist-item"><label>Chapas Laterais</label><select name="chapasLaterais"><option>Ok</option><option>Restaurar</option></select></div><div class="checklist-item"><label>Piso de inox</label><select name="pisoInox"><option>Ok</option><option>Substituir</option></select></div><div class="checklist-item"><label>Dreno</label><select name="dreno"><option>Ok</option><option>Substituir</option></select></div>
+                </div>
+                <div id="tabPane3" class="tab-pane hidden">
+                    <h4>Checklist - Estrutura Externa</h4>
+                    <div class="checklist-item"><label>Funilaria externa</label><select name="funilariaExterna"><option>Ok</option><option>Restaurar</option></select></div><div class="checklist-item"><label>Fundo</label><select name="fundo"><option>Ok</option><option>Substituir</option></select></div><div class="checklist-item"><label>Rodízios</label><select name="rodiziosEx"><option>Ok</option><option>Substituir</option></select></div><div class="checklist-item"><label>Estrutura de madeiras</label><select name="estruturaMadeiras"><option>Ok</option><option>Substituir</option></select></div><div class="checklist-item"><label>Dobradiças</label><select name="dobradicasEx"><option>Ok</option><option>Substituir</option></select></div><div class="checklist-item"><label>Fechadura</label><select name="fechaduraEx"><option>Ok</option><option>Substituir</option></select></div>
+                </div>
+                <div id="tabPane4" class="tab-pane hidden">
+                    <h4>Checklist - Materiais e Peças</h4>
+                    <div id="checklistMateriaisContainer"></div>
+                </div>
+                <div class="form-navigation-buttons">
+                    <button type="button" id="btnPrev" class="btn btn-secundario btn-pequeno">Anterior</button>
+                    <button type="button" id="btnNext" class="btn btn-principal btn-pequeno">Próximo</button>
+                    <button type="submit" id="btnGerarOS" class="btn btn-sucesso btn-pequeno hidden">Gerar Ordem de Serviço</button>
+                </div>
+            </form>
+        </div>
+        <div id="osListView" class="view hidden">
+            <button id="btnBackToHomeFromOSList" class="btn btn-secundario btn-pequeno" style="margin-bottom: 20px;">Voltar</button>
+            <h2>Ordens de Serviço Cadastradas</h2>
+            <div id="osListContainer"></div>
+        </div>
+    </div>
 <script>
-const materiaisList = ["Fundo externo inox","Piso interno inox","Chapas de Alumínio","Rodízios","Madeiras","Dobradiças","Fechadura","Rebites","Brocas"];
-const matContainer = document.getElementById('materiais');
-materiaisList.forEach((m, i) => {
-  matContainer.innerHTML += `<label>${m}:</label><select id="mat${i}"><option>Ok</option><option>Estoque zerado</option></select><input type="text" id="qtd${i}" placeholder="Quantidade (se Ok)">`;
+document.addEventListener('DOMContentLoaded', () => {
+    const STORAGE_KEY = 'saripan_service_orders';
+    let currentTab = 1;
+
+    const saveToLocalStorage = (data) => {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    };
+
+    const loadFromLocalStorage = () => {
+        const storedData = localStorage.getItem(STORAGE_KEY);
+        if (storedData) {
+            const parsedData = JSON.parse(storedData);
+            return parsedData.map(os => ({
+                ...os,
+                dataCriacao: new Date(os.dataCriacao),
+                dataFinalizacao: os.dataFinalizacao ? new Date(os.dataFinalizacao) : null
+            }));
+        }
+        return [];
+    };
+
+    let serviceOrders = loadFromLocalStorage();
+    let osCounter = serviceOrders.length > 0 ? Math.max(0, ...serviceOrders.map(os => os.id)) : 0;
+    
+    const views = { home: document.getElementById('homeView'), cadastro: document.getElementById('cadastroView'), osList: document.getElementById('osListView') };
+    const form = document.getElementById('formCadastro');
+    const equipamentoSelect = document.getElementById('equipamento');
+    const tabButtons = document.querySelectorAll('.tab-button');
+    const tabPanes = document.querySelectorAll('.tab-pane');
+    const btnPrev = document.getElementById('btnPrev');
+    const btnNext = document.getElementById('btnNext');
+    const btnGerarOS = document.getElementById('btnGerarOS');
+    const osListContainer = document.getElementById('osListContainer');
+    const checklistMateriaisContainer = document.getElementById('checklistMateriaisContainer');
+
+    const switchView = (viewToShow) => {
+        Object.values(views).forEach(view => view.classList.add('hidden'));
+        views[viewToShow].classList.remove('hidden');
+    };
+
+    document.getElementById('btnGoToCadastro').addEventListener('click', () => { resetForm(); switchView('cadastro'); });
+    document.getElementById('btnGoToOSList').addEventListener('click', () => switchView('osList'));
+    document.getElementById('btnBackToHomeFromCadastro').addEventListener('click', () => switchView('home'));
+    document.getElementById('btnBackToHomeFromOSList').addEventListener('click', () => switchView('home'));
+
+    const navigateToTab = (tabNumber) => {
+        if (tabNumber < 1 || tabNumber > 4 || (tabNumber > 1 && !equipamentoSelect.value)) return;
+        currentTab = tabNumber;
+        tabButtons.forEach(btn => {
+            const btnTab = parseInt(btn.dataset.tab);
+            btn.classList.toggle('active', btnTab === currentTab);
+            btn.disabled = btnTab > currentTab || (btnTab > 1 && !equipamentoSelect.value);
+        });
+        tabPanes.forEach((pane, index) => pane.classList.toggle('hidden', (index + 1) !== currentTab));
+        btnPrev.classList.toggle('hidden', currentTab === 1);
+        btnNext.classList.toggle('hidden', currentTab === 4);
+        btnGerarOS.classList.toggle('hidden', currentTab !== 4);
+    };
+
+    equipamentoSelect.addEventListener('change', () => {
+        if(equipamentoSelect.value) {
+            tabButtons.forEach(btn => btn.disabled = (parseInt(btn.dataset.tab) > 1) ? false : false);
+            navigateToTab(2);
+        } else {
+            resetForm();
+        }
+    });
+
+    btnNext.addEventListener('click', () => navigateToTab(currentTab + 1));
+    btnPrev.addEventListener('click', () => navigateToTab(currentTab - 1));
+    tabButtons.forEach(btn => btn.addEventListener('click', () => !btn.disabled && navigateToTab(parseInt(btn.dataset.tab))));
+
+    const renderMateriaisChecklist = () => {
+        const materiais = [
+            { name: 'fundoExternoInox', label: 'Fundo externo inox' }, { name: 'pisoInternoInox', label: 'Piso interno inox' },
+            { name: 'chapasAluminio', label: 'Chapas de Alumínio' }, { name: 'rodiziosMat', label: 'Rodízios' }, { name: 'madeirasMat', label: 'Madeiras' },
+            { name: 'dobradicasMat', label: 'Dobradiças' }, { name: 'fechaduraMat', label: 'Fechadura' }, { name: 'rebites', label: 'Rebites' }, { name: 'brocas', label: 'Brocas' },
+        ];
+        checklistMateriaisContainer.innerHTML = materiais.map(item => `
+            <div class="checklist-item"><label>${item.label}</label>
+                <div class="checklist-item-options">
+                    <select name="${item.name}_status" data-target="${item.name}_qty"><option>Ok</option><option>Estoque zerado</option></select>
+                    <input type="text" name="${item.name}_qty" id="${item.name}_qty" placeholder="Ex: 1 par" value="1" class="quantity-input">
+                </div>
+            </div>`).join('');
+        checklistMateriaisContainer.querySelectorAll('select').forEach(select => {
+            const qtyInput = document.getElementById(select.dataset.target);
+            select.addEventListener('change', () => qtyInput.classList.toggle('hidden', select.value !== 'Ok'));
+        });
+    };
+
+    const resetForm = () => {
+        form.reset();
+        currentTab = 1;
+        navigateToTab(1);
+        tabButtons.forEach(btn => btn.disabled = parseInt(btn.dataset.tab) > 1);
+    };
+
+    form.addEventListener('submit', (e) => {
+        e.preventDefault();
+        osCounter++;
+        const formData = new FormData(form);
+        const osData = {
+            id: osCounter, dataCriacao: new Date(), dataFinalizacao: null, status: 'Em andamento',
+            equipamento: formData.get('equipamento'),
+            checklists: { interna: [], externa: [], materiais: [] }
+        };
+        const collectChecklistData = (paneSelector, category) => {
+            document.querySelectorAll(paneSelector).forEach(item => {
+                const label = item.querySelector('label').textContent;
+                const select = item.querySelector('select');
+                let value = select.value;
+                if (category === 'materiais') {
+                    const qtyInput = item.querySelector('input[type="text"]');
+                    if (value === 'Ok' && qtyInput && !qtyInput.classList.contains('hidden')) {
+                        value += ` (Qtd: ${qtyInput.value})`;
+                    }
+                }
+                osData.checklists[category].push({ label, value, relatorio: '' });
+            });
+        };
+        collectChecklistData('#tabPane2 .checklist-item', 'interna');
+        collectChecklistData('#tabPane3 .checklist-item', 'externa');
+        collectChecklistData('#tabPane4 .checklist-item', 'materiais');
+        serviceOrders.push(osData);
+        saveToLocalStorage(serviceOrders);
+        renderOSCards();
+        switchView('osList');
+    });
+
+    const createChecklistHTML = (checklist, osId, category) => checklist.map((item, index) => `
+        <div class="os-item">
+            <div class="os-item-header"><span class="os-item-label">${item.label}</span><span class="os-item-value">${item.value}</span></div>
+            <div class="os-item-relatorio">
+                <input type="text" class="relatorio-input" placeholder="Relatório do técnico..." data-os-id="${osId}" data-category="${category}" data-index="${index}" value="${item.relatorio || ''}">
+                <span class="relatorio-pdf-text">${item.relatorio || 'N/A'}</span>
+            </div>
+        </div>`).join('');
+
+    const renderOSCards = () => {
+        osListContainer.innerHTML = serviceOrders.length === 0 ? '<p>Nenhuma Ordem de Serviço cadastrada.</p>' : '';
+        serviceOrders.forEach(os => {
+            const card = document.createElement('div');
+            card.className = `os-card ${os.status === 'Finalizado' ? 'finalizado' : ''}`;
+            card.id = `os-card-${os.id}`;
+            let dateHtml;
+            const dateOptions = { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' };
+            if (os.status === 'Finalizado' && os.dataFinalizacao) {
+                const dataFormatada = os.dataFinalizacao.toLocaleDateString('pt-BR', dateOptions);
+                dateHtml = `<div class="date finalizado">Serviço finalizado em: ${dataFormatada}</div>`;
+            } else {
+                const dataFormatada = os.dataCriacao.toLocaleDateString('pt-BR', dateOptions);
+                dateHtml = `<div class="date">Criado em: ${dataFormatada}</div>`;
+            }
+            card.innerHTML = `
+                <h3>Ordem de Serviço #${String(os.id).padStart(4, '0')}</h3>
+                <p><strong>Equipamento:</strong> ${os.equipamento}</p>
+                <div class="os-card-body">
+                    <div class="os-card-section"><h4>Estrutura Interna</h4>${createChecklistHTML(os.checklists.interna, os.id, 'interna')}</div>
+                    <div class="os-card-section"><h4>Estrutura Externa</h4>${createChecklistHTML(os.checklists.externa, os.id, 'externa')}</div>
+                    <div class="os-card-section"><h4>Materiais e Peças</h4>${createChecklistHTML(os.checklists.materiais, os.id, 'materiais')}</div>
+                </div>
+                <div class="os-card-footer">
+                    ${dateHtml}
+                    <div class="actions">
+                        <button class="btn btn-pequeno btn-sucesso btn-finalizar" data-id="${os.id}">Finalizar e Arquivar</button>
+                        <button class="btn btn-pequeno btn-secundario btn-download" data-id="${os.id}">Download (PDF)</button>
+                    </div>
+                </div>`;
+            osListContainer.appendChild(card);
+            if(os.status === 'Finalizado') {
+                card.querySelectorAll('input, button.btn-finalizar').forEach(el => el.disabled = true);
+            }
+        });
+        addCardEventListeners();
+    };
+    
+    // --- FUNÇÃO REUTILIZÁVEL PARA GERAR PDF ---
+    const generateAndDownloadPDF = async (osId) => {
+        const cardElement = document.getElementById(`os-card-${osId}`);
+        if (!cardElement) return;
+
+        cardElement.querySelectorAll('.relatorio-input').forEach(input => {
+            input.nextElementSibling.textContent = input.value || 'N/A';
+        });
+        cardElement.classList.add('is-generating-pdf');
+
+        try {
+            const canvas = await html2canvas(cardElement, { scale: 2 });
+            const imgData = canvas.toDataURL('image/png');
+            const { jsPDF } = window.jspdf;
+            const pdf = new jsPDF({ orientation: 'l', unit: 'mm', format: 'a3' });
+            const pdfWidth = pdf.internal.pageSize.getWidth();
+            const pdfHeight = pdf.internal.pageSize.getHeight();
+            const ratio = canvas.width / canvas.height;
+            let imgWidth = pdfWidth - 20;
+            let imgHeight = imgWidth / ratio;
+            if (imgHeight > pdfHeight - 20) {
+                imgHeight = pdfHeight - 20;
+                imgWidth = imgHeight * ratio;
+            }
+            pdf.addImage(imgData, 'PNG', 10, 10, imgWidth, imgHeight);
+            pdf.save(`Saripan-OS-${String(osId).padStart(4, '0')}.pdf`);
+        } catch (error) {
+            console.error("Erro ao gerar PDF:", error);
+            alert("Ocorreu um erro ao gerar o PDF.");
+        } finally {
+            cardElement.classList.remove('is-generating-pdf');
+        }
+    };
+
+    const addCardEventListeners = () => {
+        // Listener para o botão de Finalizar e Arquivar
+        document.querySelectorAll('.btn-finalizar').forEach(button => button.addEventListener('click', async (e) => {
+            const osId = parseInt(e.target.dataset.id);
+            if (confirm("Tem certeza que deseja finalizar e arquivar esta OS? Esta ação é permanente.")) {
+                const osIndex = serviceOrders.findIndex(o => o.id === osId);
+                if (osIndex > -1) {
+                    // 1. Atualiza o status e a data para o PDF
+                    serviceOrders[osIndex].status = 'Finalizado';
+                    serviceOrders[osIndex].dataFinalizacao = new Date();
+                    
+                    // 2. Renderiza temporariamente para o PDF ter a informação correta
+                    renderOSCards();
+
+                    // 3. Gera e baixa o PDF
+                    await generateAndDownloadPDF(osId);
+
+                    // 4. Remove a OS do array
+                    serviceOrders.splice(osIndex, 1);
+                    
+                    // 5. Salva a lista atualizada e re-renderiza a UI
+                    saveToLocalStorage(serviceOrders);
+                    renderOSCards();
+                }
+            }
+        }));
+
+        // Listener para o botão de Download (ação não destrutiva)
+        document.querySelectorAll('.btn-download').forEach(button => button.addEventListener('click', (e) => {
+             generateAndDownloadPDF(parseInt(e.target.dataset.id));
+        }));
+
+        // Listener para salvar relatórios enquanto digita
+        document.querySelectorAll('.relatorio-input').forEach(input => input.addEventListener('input', e => {
+            const { osId, category, index } = e.target.dataset;
+            const os = serviceOrders.find(o => o.id === parseInt(osId));
+            if (os) {
+                os.checklists[category][index].relatorio = e.target.value;
+                saveToLocalStorage(serviceOrders);
+            }
+        }));
+    };
+    
+    renderMateriaisChecklist();
+    resetForm();
+    renderOSCards();
 });
-
-function showTab(i) {
-  document.querySelectorAll('.tab').forEach((el, index) => {
-    el.classList.toggle('active', index === i);
-  });
-  document.getElementById('menu').style.display = i === null ? 'block' : 'none';
-}
-
-function gerarOS() {
-  const equipamento = document.getElementById('equipamento').value;
-  const interna = [
-    {nome:'Chapas Laterais', val:interna1.value},
-    {nome:'Piso de Inox', val:interna2.value},
-    {nome:'Dreno', val:interna3.value},
-  ];
-  const externa = [
-    {nome:'Funilaria externa', val:externa1.value},
-    {nome:'Fundo', val:externa2.value},
-    {nome:'Rodízios', val:externa3.value},
-    {nome:'Estrutura de madeiras', val:externa4.value},
-    {nome:'Dobradiças', val:externa5.value},
-    {nome:'Fechadura', val:externa6.value},
-  ];
-  const materiais = materiaisList.map((nome, i) => ({
-    nome,
-    val: document.getElementById('mat'+i).value,
-    qtd: document.getElementById('qtd'+i).value
-  }));
-  const os = { equipamento, interna, externa, materiais, data: new Date().toLocaleString() };
-  const salvas = JSON.parse(localStorage.getItem('ordens') || '[]');
-  salvas.push(os);
-  localStorage.setItem('ordens', JSON.stringify(salvas));
-  alert('Ordem de serviço salva!');
-  showOrdens();
-}
-
-function showOrdens() {
-  showTab(5);
-  const lista = document.getElementById('lista-os');
-  lista.innerHTML = '';
-  const ordens = JSON.parse(localStorage.getItem('ordens') || '[]');
-  if (!ordens.length) {
-    lista.innerHTML = '<p>Nenhuma OS cadastrada.</p>';
-    return;
-  }
-  ordens.forEach((os, index) => {
-    let html = `<div class='ordem-card' id='os-${index}' style='width: 210mm; max-width: 100%; overflow-wrap: break-word;'>
-      <div class='ordem-header' onclick='toggleCard(${index})'>Ordem de Serviço - ${os.equipamento} (${os.data})</div>
-      <div class='ordem-body' id='card-${index}'>
-      <h4>Estrutura Interna:</h4>`;
-    os.interna.forEach(i => html += `<p>${i.nome}: ${i.val}</p><div class='editable' contenteditable='true' data-placeholder='Relato técnico aqui'></div>`);
-    html += '<h4>Estrutura Externa:</h4>';
-    os.externa.forEach(i => html += `<p>${i.nome}: ${i.val}</p><div class='editable' contenteditable='true' data-placeholder='Relato técnico aqui'></div>`);
-    html += '<h4>Materiais e Peças:</h4>';
-    os.materiais.forEach(i => html += `<p>${i.nome}: ${i.val} ${i.qtd ? 'Qtd: ' + i.qtd : ''}</p><div class='editable' contenteditable='true' data-placeholder='Relato técnico aqui'></div>`);
-    html += `<p style='text-align:right'>
-      <button onclick='exportarImagem(${index})'>Exportar Imagem</button>
-      <button onclick='confirmarFinalizacao(${index})'>Restauração finalizada</button></p>
-      </div></div>`;
-    lista.innerHTML += html;
-  });
-}
-
-function toggleCard(i) {
-  const card = document.getElementById('card-' + i);
-  card.style.display = card.style.display === 'none' || !card.style.display ? 'block' : 'none';
-}
-
-function exportarImagem(i, incluirRodape = false) {
-  const elemento = document.getElementById('os-' + i);
-  const cardBody = document.getElementById('card-' + i);
-  const estavaEscondido = cardBody.style.display === 'none' || !cardBody.style.display;
-  if (estavaEscondido) cardBody.style.display = 'block';
-
-  let rodape, nomeArquivo;
-  if (incluirRodape) {
-    rodape = document.createElement('div');
-    rodape.style.textAlign = 'center';
-    rodape.style.marginTop = '15px';
-    rodape.style.fontWeight = 'bold';
-    rodape.style.fontSize = '14px';
-    rodape.style.borderTop = '1px solid #ccc';
-    rodape.style.paddingTop = '8px';
-    const hoje = new Date();
-    const dataFormatada = hoje.toLocaleDateString('pt-BR');
-    rodape.textContent = `Serviço finalizado em ${dataFormatada}`;
-    elemento.appendChild(rodape);
-
-    const ordens = JSON.parse(localStorage.getItem('ordens') || '[]');
-    const equipamento = ordens[i].equipamento || 'Servico';
-    const equipamentoSanitized = equipamento.toLowerCase().replace(/\s+/g, '_').replace(/[^\w_-]/g, '');
-    const d = hoje.getDate().toString().padStart(2, '0');
-    const m = (hoje.getMonth() + 1).toString().padStart(2, '0');
-    const a = hoje.getFullYear();
-    nomeArquivo = `${equipamentoSanitized}_servico_finalizado_em_${d}-${m}-${a}.jpeg`;
-  } else {
-    nomeArquivo = `OS-${i + 1}.jpeg`;
-  }
-
-  html2canvas(elemento, { scale: 2, useCORS: true }).then(canvas => {
-    const link = document.createElement('a');
-    link.download = nomeArquivo;
-    link.href = canvas.toDataURL('image/jpeg', 0.95);
-    link.click();
-    if (rodape) elemento.removeChild(rodape);
-    if (estavaEscondido) cardBody.style.display = 'none';
-  });
-}
-
-function confirmarFinalizacao(i) {
-  if (confirm("Deseja salvar uma imagem antes de finalizar?")) {
-    exportarImagem(i, true);
-    setTimeout(() => finalizar(i), 1000);
-  } else {
-    finalizar(i);
-  }
-}
-
-function finalizar(i) {
-  const ordens = JSON.parse(localStorage.getItem('ordens') || '[]');
-  ordens.splice(i, 1);
-  localStorage.setItem('ordens', JSON.stringify(ordens));
-  showOrdens();
-}
 </script>
+
 </body>
 </html>
